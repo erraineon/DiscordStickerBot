@@ -3,6 +3,8 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Discord.Commands;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Processing;
 using Telegram.Bot;
 using Telegram.Bot.Types;
 
@@ -18,7 +20,7 @@ namespace DiscordStickerBot
         }
 
         [Command("import")]
-        public async Task ImportAsync([Remainder] string stickerPackNameOrUrl)
+        public async Task ImportAsync(string stickerPackNameOrUrl, int? maxSize = null)
         {
             var stickerPackName = GetStickerPackName(stickerPackNameOrUrl);
             try
@@ -26,7 +28,8 @@ namespace DiscordStickerBot
                 var stickerPack = await _telegramBotClient.GetStickerSetAsync(stickerPackName);
                 foreach (var sticker in stickerPack.Stickers.Where(s => !s.IsAnimated))
                 {
-                    var gifStream = await GetStickerGifStream(sticker);
+                    var gifStream = await GetStickerGifStreamAsync(sticker);
+                    if (maxSize != null) gifStream = await ResizeImageAsync(gifStream, maxSize.Value);
                     await Context.Channel.SendFileAsync(gifStream, $"{sticker.FileId}.gif");
                 }
             }
@@ -39,6 +42,24 @@ namespace DiscordStickerBot
             }
         }
 
+        private async Task<MemoryStream> ResizeImageAsync(MemoryStream stream, int maxSize)
+        {
+            using var canvas = await Image.LoadAsync(stream);
+            var largerDimension = Math.Max(canvas.Width, canvas.Height);
+            var sizeRatio = (float) largerDimension / maxSize;
+            var result = sizeRatio > 1 ? await ResizeImageAsync(canvas, sizeRatio) : stream;
+            return result;
+        }
+
+        private static async Task<MemoryStream> ResizeImageAsync(Image canvas, float sizeRatio)
+        {
+            var resizedStream = new MemoryStream();
+            canvas.Mutate(c => c.Resize((Size) (c.GetCurrentSize() / sizeRatio)));
+            await canvas.SaveAsGifAsync(resizedStream);
+            resizedStream.Seek(0, SeekOrigin.Begin);
+            return resizedStream;
+        }
+
         private static string GetStickerPackName(string stickerPackNameOrUrl)
         {
             const string packUrlPrefix = "https://t.me/addstickers/";
@@ -48,7 +69,7 @@ namespace DiscordStickerBot
             return stickerPackName;
         }
 
-        private async Task<MemoryStream> GetStickerGifStream(Sticker sticker)
+        private async Task<MemoryStream> GetStickerGifStreamAsync(Sticker sticker)
         {
             var stickerStream = new MemoryStream();
             await _telegramBotClient.GetInfoAndDownloadFileAsync(sticker.FileId, stickerStream);
