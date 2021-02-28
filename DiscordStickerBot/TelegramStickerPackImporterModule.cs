@@ -3,10 +3,13 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Discord.Commands;
+using ImageProcessorCore.Plugins.WebP.Formats;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Processing;
 using Telegram.Bot;
 using Telegram.Bot.Types;
+using Image = SixLabors.ImageSharp.Image;
+using ImageFormat = System.Drawing.Imaging.ImageFormat;
 
 namespace DiscordStickerBot
 {
@@ -55,7 +58,7 @@ namespace DiscordStickerBot
         {
             var resizedStream = new MemoryStream();
             canvas.Mutate(c => c.Resize((Size) (c.GetCurrentSize() / sizeRatio)));
-            await canvas.SaveAsGifAsync(resizedStream);
+            await canvas.SaveAsPngAsync(resizedStream);
             resizedStream.Seek(0, SeekOrigin.Begin);
             return resizedStream;
         }
@@ -74,7 +77,10 @@ namespace DiscordStickerBot
             var stickerStream = new MemoryStream();
             await _telegramBotClient.GetInfoAndDownloadFileAsync(sticker.FileId, stickerStream);
             stickerStream.Seek(0, SeekOrigin.Begin);
-            return stickerStream;
+            var gifStream = new MemoryStream();
+            new WebPFormat().Load(stickerStream).Save(gifStream, ImageFormat.Png);
+            gifStream.Seek(0, SeekOrigin.Begin);
+            return gifStream;
         }
     }
 }
