@@ -8,5 +8,4 @@ import telegram stickers into discord
 5. favorited the gifs from the star in the top right corner and use as "stickers"
 
 optionally, use `.import sticker-pack-name-or-url maximum-size` to resize the stickers to a maximum size
-
 for example, to get my stickers in 256x256, use `.import Errai39373NL 256`
